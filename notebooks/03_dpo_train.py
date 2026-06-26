@@ -90,17 +90,10 @@ if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
 def _force_sdpa(m):
-    if hasattr(m, "config") and hasattr(m.config, "_attn_implementation"):
-        m.config._attn_implementation = "sdpa"
-    if hasattr(m, "base_model"):
-        _force_sdpa(m.base_model)
-        if hasattr(m.base_model, "model"):
-            _force_sdpa(m.base_model.model)
-
-_force_sdpa(model)
-
-# Load SFT adapter — DPO trains this LoRA in-place (Lab21 uses q_proj+v_proj only).
-import json
+    for mod in m.modules():
+        cfg = getattr(mod, "config", None)
+        if cfg is not None and hasattr(cfg, "_attn_implementation"):
+            cfg._attn_implementation = "sdpa"
 
 model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
 _force_sdpa(model)
