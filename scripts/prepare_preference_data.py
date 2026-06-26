@@ -21,6 +21,18 @@ from transformers import AutoTokenizer
 REPO = Path(__file__).resolve().parent.parent
 
 
+def resolve_tokenizer_path(path: Path) -> str:
+    """Adapter dir may lack chat_template — fall back to base Qwen tokenizer."""
+    for candidate in (path, path / "r16"):
+        if not candidate.is_dir():
+            continue
+        if (candidate / "tokenizer.json").exists():
+            tok = AutoTokenizer.from_pretrained(str(candidate))
+            if tok.chat_template:
+                return str(candidate)
+    return "Qwen/Qwen2.5-3B"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -47,8 +59,9 @@ def main():
     ds = load_dataset(args.dataset, split=f"train[:{pref_slice}]")
     print(f"  {len(ds)} pairs · cols: {ds.column_names}")
 
-    print(f"Loading tokenizer from {args.tokenizer}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    tok_path = resolve_tokenizer_path(Path(args.tokenizer))
+    print(f"Loading tokenizer from {tok_path}...")
+    tokenizer = AutoTokenizer.from_pretrained(tok_path)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
