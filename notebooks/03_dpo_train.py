@@ -89,29 +89,17 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
-# Load SFT adapter on top of base
+# Load SFT adapter — DPO trains this LoRA in-place (Lab21 uses q_proj+v_proj only).
+import json
+
 model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
-print(f"Policy: {model.__class__.__name__} with SFT adapter loaded")
+sft_cfg = json.loads((SFT_PATH / "adapter_config.json").read_text())
+print(f"Policy: {model.__class__.__name__}  LoRA r={sft_cfg['r']}  targets={sft_cfg['target_modules']}")
+print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
 # %%
-# Wrap policy with NEW LoRA adapter for DPO updates (don't merge SFT — keep stacked)
-# Unsloth re-applies LoRA on top of the existing PeftModel.
-model = FastLanguageModel.get_peft_model(
-    model,
-    r=16,
-    lora_alpha=32,
-    lora_dropout=0.0,
-    bias="none",
-    target_modules=[
-        "q_proj", "k_proj", "v_proj", "o_proj",
-        "gate_proj", "up_proj", "down_proj",
-    ],
-    use_gradient_checkpointing="unsloth",
-    random_state=42,
-    use_rslora=False,
-    loftq_config=None,
-)
-print(f"Trainable params (DPO LoRA): {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+# NOTE: Do NOT call get_peft_model() again — Lab21 SFT adapter is already loaded.
+# Stacking a second LoRA with different target_modules crashes Unsloth.
 
 # %% [markdown]
 # > **Why no separate `ref_model=` argument?** Modern TRL (≥ 0.12) auto-detects

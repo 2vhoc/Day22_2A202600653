@@ -60,13 +60,10 @@ def main():
         tokenizer.pad_token = tokenizer.eos_token
 
     model = PeftModel.from_pretrained(model, args.sft_path, is_trainable=True)
-    model = FastLanguageModel.get_peft_model(
-        model, r=16, lora_alpha=32, lora_dropout=0.0, bias="none",
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                        "gate_proj", "up_proj", "down_proj"],
-        use_gradient_checkpointing="unsloth",
-        random_state=42, use_rslora=False, loftq_config=None,
-    )
+    import json
+    sft_cfg = json.loads((Path(args.sft_path) / "adapter_config.json").read_text())
+    print(f"SFT LoRA r={sft_cfg['r']}  targets={sft_cfg['target_modules']}")
+    print(f"Trainable: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
 
     config = DPOConfig(
         output_dir=str(output.parent / f"{output.name}-checkpoints"),
