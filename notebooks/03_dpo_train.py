@@ -79,7 +79,7 @@ assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
 from unsloth import FastLanguageModel
 from peft import PeftModel
 
-# Policy — gets new DPO LoRA adapter on top of SFT LoRA
+# Policy — DPO trains SFT LoRA in-place (Lab21 uses q_proj+v_proj only).
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=BASE_MODEL,
     max_seq_length=MAX_LEN,
@@ -89,10 +89,21 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
+def _force_sdpa(m):
+    if hasattr(m, "config") and hasattr(m.config, "_attn_implementation"):
+        m.config._attn_implementation = "sdpa"
+    if hasattr(m, "base_model"):
+        _force_sdpa(m.base_model)
+        if hasattr(m.base_model, "model"):
+            _force_sdpa(m.base_model.model)
+
+_force_sdpa(model)
+
 # Load SFT adapter — DPO trains this LoRA in-place (Lab21 uses q_proj+v_proj only).
 import json
 
 model = PeftModel.from_pretrained(model, str(SFT_PATH), is_trainable=True)
+_force_sdpa(model)
 sft_cfg = json.loads((SFT_PATH / "adapter_config.json").read_text())
 print(f"Policy: {model.__class__.__name__}  LoRA r={sft_cfg['r']}  targets={sft_cfg['target_modules']}")
 print(f"Trainable params: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
