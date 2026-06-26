@@ -78,6 +78,7 @@ assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
 # %%
 from unsloth import FastLanguageModel
 from peft import PeftModel
+import json
 
 # Policy — DPO trains SFT LoRA in-place (Lab21 uses q_proj+v_proj only).
 model, tokenizer = FastLanguageModel.from_pretrained(
