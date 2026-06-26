@@ -38,3 +38,11 @@ hf_cache/
 .idea/
 .vscode/
 *.swp
+
+# Local workspace clutter (not submission)
+content/
+Day22_2A202600653/
+*.zip
+lab22.zip
+unsloth_compiled_cache/
+huggingface_tokenizers_cache/
