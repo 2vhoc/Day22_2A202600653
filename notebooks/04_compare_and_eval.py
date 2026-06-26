@@ -66,7 +66,17 @@ assert torch.cuda.is_available(), "Need GPU for generation"
 # %%
 from unsloth import FastLanguageModel
 from peft import PeftModel
+from transformers import AutoTokenizer
 import gc
+
+
+def _fix_tokenizer(tokenizer):
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    if not getattr(tokenizer, "chat_template", None):
+        ref = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B")
+        tokenizer.chat_template = ref.chat_template
+    return tokenizer
 
 
 def generate_with_adapter(adapter_path: Path, prompts: list[dict], max_new_tokens: int = 256):
@@ -77,8 +87,7 @@ def generate_with_adapter(adapter_path: Path, prompts: list[dict], max_new_token
         dtype=None,
         load_in_4bit=True,
     )
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer = _fix_tokenizer(tokenizer)
 
     model = PeftModel.from_pretrained(model, str(adapter_path))
     FastLanguageModel.for_inference(model)
